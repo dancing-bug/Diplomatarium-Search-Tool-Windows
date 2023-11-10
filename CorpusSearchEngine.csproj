@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Images\clipboardIcon1.png" />
+    <None Remove="Images\expandIcon1.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Images\clipboardIcon1.png" />
+    <Resource Include="Images\expandIcon1.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Texts\DIPLOMATARIUM.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
