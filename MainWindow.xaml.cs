@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -13,6 +14,7 @@ namespace CorpusSearchEngine
     {
         int cnt = 1;
         string word = string.Empty;
+        List<string> words = new List<string>();
         bool isSearching = false;
         int wordsCount = 0;
 
@@ -27,10 +29,10 @@ namespace CorpusSearchEngine
             {
                 isSearching = true;
 
-                word = searchTextbox.Text;
+                words = searchTextbox.Text.Split(',').ToList();
                 canvasStackPanel.Children.Clear();
 
-                await Task.Run(() => SearchForWord(word));
+                await Task.Run(() => SearchForWords(words));
             }
         }
 
@@ -42,10 +44,10 @@ namespace CorpusSearchEngine
                 {
                     isSearching = true;
 
-                    word = searchTextbox.Text;
+                    words = searchTextbox.Text.Split(',').ToList();
                     canvasStackPanel.Children.Clear();
 
-                    await Task.Run(() => SearchForWord(word));
+                    await Task.Run(() => SearchForWords(words));
                 }
             }
 
@@ -190,7 +192,7 @@ namespace CorpusSearchEngine
             return uniqueList;
         }
 
-        private void CreateTabsFromText(string text, List<int[]> bindNumberStartEndIndexes)
+        private void CreateTabsFromText(string text, string word, List<int[]> bindNumberStartEndIndexes)
         {
             int numberIndex, bindIndex, textStartIndex, textEndIndex;
             string numberValue, bindValue, textValue;
@@ -230,8 +232,16 @@ namespace CorpusSearchEngine
             Dispatcher.Invoke(() => UpdateResultText("Generowanie etykiet"));
 
             List<int[]> filteredBindNumberStartEndIndexes = RemoveDuplicates(bindNumberStartEndIndexes);
-            CreateTabsFromText(textContent, filteredBindNumberStartEndIndexes);
+            CreateTabsFromText(textContent, word, filteredBindNumberStartEndIndexes);
             Dispatcher.Invoke(() => UpdateResultText("Znalezione teksty: " + wordsCount.ToString()));
+
+        }
+
+        public void SearchForWords(List<string> words)
+        {
+            for (int i = 0; i < words.Count; i++) {
+                SearchForWord(words[i]);
+            }
 
             isSearching = false;
         }
