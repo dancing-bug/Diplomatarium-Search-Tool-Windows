@@ -282,6 +282,7 @@ namespace CorpusSearchEngine
             Dispatcher.Invoke(() => UpdateResultText("Generowanie etykiet"));
 
             List<int[]> filteredBindNumberStartEndIndexes = bindNumberStartEndIndexes.Distinct().ToList(); //RemoveDuplicates(bindNumberStartEndIndexes);
+
             CreateTabsFromText(textContent, word, filteredBindNumberStartEndIndexes);
             Dispatcher.Invoke(() => UpdateResultText("Znalezione teksty: " + wordsCount.ToString()));
 
