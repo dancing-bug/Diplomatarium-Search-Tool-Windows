@@ -1,4 +1,5 @@
 ﻿using CorpusSearchEngine.CustomElements;
+using CorpusSearchEngine.Enums;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,13 +18,29 @@ namespace CorpusSearchEngine
         List<string> words = new List<string>();
         bool isSearching = false;
         int wordsCount = 0;
+        int bufferSize = 1024 * 1024; // 1 MB buffer size
+        SearchMethods searchMethod = SearchMethods.StreamBlocks;
 
         public MainWindow()
         {
             InitializeComponent();
         }
 
-        async void searchButton_Click(object sender, RoutedEventArgs e)
+        private void searchButton_Click(object sender, RoutedEventArgs e)
+        {
+            StartSearch();
+        }
+
+        private void searchTextbox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                StartSearch();
+            }
+
+        }
+
+        async void StartSearch()
         {
             if (!isSearching)
             {
@@ -32,25 +49,50 @@ namespace CorpusSearchEngine
                 words = searchTextbox.Text.Split(',').ToList();
                 canvasStackPanel.Children.Clear();
 
-                await Task.Run(() => SearchForWords(words));
+                await Task.Run(() => SearchForWords(words, searchMethod));
             }
         }
 
-        async void searchTextbox_PreviewKeyDown(object sender, KeyEventArgs e)
+        private List<int> GetWordIndexesWithStreamBlocks(string path,string word)
         {
-            if (e.Key == Key.Enter)
+            IEnumerable<int> firstCollection = FindWordIndexesInFile(path, word, bufferSize);
+            IEnumerable<int> secondCollection = FindWordIndexesInFile(path, word, bufferSize+83);
+            List<int> mergedCollection = firstCollection.Concat(secondCollection).Distinct().OrderBy(x => x).ToList();
+            wordsCount = mergedCollection.Count();
+
+            return mergedCollection;
+        }
+        private IEnumerable<int> FindWordIndexesInFile(string filePath, string word, int bufferSize)
+        {
+            int wordsNumber = 0;
+
+            using (var fileStream = File.OpenRead(filePath))
+            using (var streamReader = new StreamReader(fileStream))
             {
-                if (!isSearching)
+                char[] buffer = new char[bufferSize];
+                int charsRead;
+
+                int offset = 0;
+                while ((charsRead = streamReader.ReadBlock(buffer, 0, bufferSize)) > 0)
                 {
-                    isSearching = true;
+                    string chunk = new string(buffer, 0, charsRead);
 
-                    words = searchTextbox.Text.Split(',').ToList();
-                    canvasStackPanel.Children.Clear();
+                    int index = 0;
+                    while (index < charsRead)
+                    {
+                        index = chunk.IndexOf(word, index, StringComparison.Ordinal);
 
-                    await Task.Run(() => SearchForWords(words));
+                        if (index == -1)
+                            break;
+
+                        yield return offset + index; //absolute index
+                        wordsNumber++;
+                        index += word.Length;
+                    }
+
+                    offset += charsRead;
                 }
             }
-
         }
 
         private string ReadFile(string path)
@@ -61,7 +103,7 @@ namespace CorpusSearchEngine
             }
         }
 
-        private void UpdateResultText(string text)
+        public void UpdateResultText(string text)
         {
             resultText.Text = text;
         }
@@ -71,7 +113,7 @@ namespace CorpusSearchEngine
             canvasStackPanel.Children.Add(new TextTab { bind = bind, number = number, content = content});
         }
 
-        private void AddNewEntry(string bind, string number, string[] content)
+        public void AddNewEntry(string bind, string number, string[] content)
         {
             canvasStackPanel.Children.Add(new TextTab { bind = bind, number = number, highlightedContent = content});
         }
@@ -132,9 +174,9 @@ namespace CorpusSearchEngine
             return input;
         }
 
-        private ArrayList FindWordIndexesInText(string text, string word)
+        private List<int> GetWordIndexesWithIndexOf(string text, string word)
         {
-            ArrayList foundWords = new ArrayList();
+            List<int> foundWords = new List<int>();
             int lastIndex = 0;
             wordsCount = 0;
 
@@ -154,13 +196,14 @@ namespace CorpusSearchEngine
             return foundWords;
         }
 
-        private ArrayList FindBindNumberStartEndIndexes(string text, ArrayList wordIndexes)
+        private List<int[]> FindBindNumberStartEndIndexes(string text, List<int> wordIndexes)
         {
-            ArrayList bindNumberStartEndIndexes = new ArrayList();
+            List<int[]> bindNumberStartEndIndexes = new List<int[]>();
+            int foundWordIndex;
 
             for (int i = 0; i < wordIndexes.Count; i++)
             {
-                int foundWordIndex = (int)wordIndexes[i];
+                foundWordIndex = wordIndexes[i];
                 int[] tmp = {   text.LastIndexOf("<b>Nummer:</b>", foundWordIndex),
                                 text.LastIndexOf("<FONT", foundWordIndex),
                                 text.LastIndexOf("Brevtekst", foundWordIndex),
@@ -171,7 +214,7 @@ namespace CorpusSearchEngine
             return bindNumberStartEndIndexes;
         }
 
-        private List<int[]> RemoveDuplicates(ArrayList list)
+        private List<int[]> RemoveDuplicates(List<int[]> list)
         {
             HashSet<string> set = new HashSet<string>();
             List<int[]> uniqueList = new List<int[]>();
@@ -217,30 +260,37 @@ namespace CorpusSearchEngine
             }
         }
 
-        public void SearchForWord(string word)
+        public void SearchForWord(string word, SearchMethods searchMethod)
         {
-            ArrayList foundWords = new ArrayList();
-            ArrayList bindNumberStartEndIndexes = new ArrayList();
+            List<int> foundWords = new List<int>();
+            List<int[]> bindNumberStartEndIndexes = new List<int[]>();
 
             string path = "Texts/DIPLOMATARIUM.html"; 
             string textContent = File.ReadAllText(path);
 
-            foundWords = FindWordIndexesInText(textContent, word);
+            if (searchMethod == SearchMethods.StreamBlocks)
+            {
+                foundWords = GetWordIndexesWithStreamBlocks(path, word);
+            }
+            else if (searchMethod == SearchMethods.IndexOf)
+            {
+                foundWords = GetWordIndexesWithIndexOf(textContent, word);
+            }
             Dispatcher.Invoke(() => UpdateResultText("Zapisywanie słów"));
 
             bindNumberStartEndIndexes = FindBindNumberStartEndIndexes(textContent, foundWords);
             Dispatcher.Invoke(() => UpdateResultText("Generowanie etykiet"));
 
-            List<int[]> filteredBindNumberStartEndIndexes = RemoveDuplicates(bindNumberStartEndIndexes);
+            List<int[]> filteredBindNumberStartEndIndexes = bindNumberStartEndIndexes.Distinct().ToList(); //RemoveDuplicates(bindNumberStartEndIndexes);
             CreateTabsFromText(textContent, word, filteredBindNumberStartEndIndexes);
             Dispatcher.Invoke(() => UpdateResultText("Znalezione teksty: " + wordsCount.ToString()));
 
         }
 
-        public void SearchForWords(List<string> words)
+        public void SearchForWords(List<string> words, SearchMethods searchMethod)
         {
             for (int i = 0; i < words.Count; i++) {
-                SearchForWord(words[i]);
+                SearchForWord(words[i], searchMethod);
             }
 
             isSearching = false;
