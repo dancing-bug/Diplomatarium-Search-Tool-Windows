@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace CorpusSearchEngine
@@ -116,6 +117,11 @@ namespace CorpusSearchEngine
         public void AddNewEntry(string bind, string number, string[] content)
         {
             canvasStackPanel.Children.Add(new TextTab { bind = bind, number = number, highlightedContent = content});
+        }
+
+        public void AddNewExpander(string word)
+        {
+            canvasStackPanel.Children.Add(new CustomExpander { word = word , isExpanded = true });
         }
 
         private string[] DivideText(string text, string word)
@@ -235,7 +241,7 @@ namespace CorpusSearchEngine
             return uniqueList;
         }
 
-        private void CreateTabsFromText(string text, string word, List<int[]> bindNumberStartEndIndexes)
+        private void CreateTabsFromText(string text, string word, List<int[]> bindNumberStartEndIndexes, CustomExpander expander)
         {
             int numberIndex, bindIndex, textStartIndex, textEndIndex;
             string numberValue, bindValue, textValue;
@@ -256,7 +262,8 @@ namespace CorpusSearchEngine
                 textValue = ReplaceLineBreaks(textValue);
                 string[] dividedText = DivideText(textValue, word);
 
-                Dispatcher.Invoke(() => AddNewEntry("Bind: " + bindValue, "Number: " + numberValue, dividedText));
+                //Dispatcher.Invoke(() => AddNewEntry("Bind: " + bindValue, "Number: " + numberValue, dividedText));
+                Dispatcher.Invoke(() => expander.AddNewEntry("Bind: " + bindValue, "Number: " + numberValue, dividedText));
             }
         }
 
@@ -267,6 +274,9 @@ namespace CorpusSearchEngine
 
             string path = "Texts/DIPLOMATARIUM.html"; 
             string textContent = File.ReadAllText(path);
+
+
+            Dispatcher.Invoke(() => AddNewExpander(word));
 
             if (searchMethod == SearchMethods.StreamBlocks)
             {
@@ -283,7 +293,27 @@ namespace CorpusSearchEngine
 
             List<int[]> filteredBindNumberStartEndIndexes = bindNumberStartEndIndexes.Distinct().ToList(); //RemoveDuplicates(bindNumberStartEndIndexes);
 
-            CreateTabsFromText(textContent, word, filteredBindNumberStartEndIndexes);
+            //CustomExpander expander = new CustomExpander();
+            //Dispatcher.Invoke(() => expander = canvasStackPanel.Children.OfType<CustomExpander>().LastOrDefault());
+
+            Dispatcher.InvokeAsync(() =>
+            {
+                // Find the CustomExpander in your UI hierarchy
+                CustomExpander expander = canvasStackPanel.Children.OfType<CustomExpander>().LastOrDefault();
+
+                if (expander != null)
+                {
+                    // Create and add TextTab to the CustomExpander
+                    CreateTabsFromText(textContent, word, filteredBindNumberStartEndIndexes, canvasStackPanel.Children.OfType<CustomExpander>().LastOrDefault());
+                }
+                else
+                {
+                    // Handle the case where no CustomExpander was found
+                    // You might want to create a new CustomExpander, add it to the canvasStackPanel, and then call AddTextTab
+                }
+            });
+
+            //CreateTabsFromText(textContent, word, filteredBindNumberStartEndIndexes, canvasStackPanel.Children.OfType<CustomExpander>().LastOrDefault());
             Dispatcher.Invoke(() => UpdateResultText("Znalezione teksty: " + wordsCount.ToString()));
 
         }

@@ -116,9 +116,9 @@
                                IsReadOnly="True">
                         <FlowDocument Name="FlowDocument1" TextAlignment="Justify" >
                             <Paragraph>
-                                <Run Name="Content1"  Text="No text"/>
-                                <Run Name="Content2"  Text="No text"/>
-                                <Run Name="Content3"  Text="No text"/>
+                                <Run Name="Content1" FontWeight="Regular" Text="No text"/>
+                                <Run Name="Content2" FontWeight="Regular" Text="No text"/>
+                                <Run Name="Content3" FontWeight="Regular" Text="No text"/>
                             </Paragraph>
                         </FlowDocument>
                     </RichTextBox>
