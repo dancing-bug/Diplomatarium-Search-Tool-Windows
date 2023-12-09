@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Shapes;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CorpusSearchEngine
 {
@@ -121,7 +123,7 @@ namespace CorpusSearchEngine
 
         public void AddNewExpander(string word)
         {
-            canvasStackPanel.Children.Add(new CustomExpander { word = word , isExpanded = true });
+            canvasStackPanel.Children.Add(new CustomExpander { word = word , isExpanded = false });
         }
 
         private string[] DivideText(string text, string word)
