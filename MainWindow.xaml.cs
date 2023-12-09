@@ -123,7 +123,7 @@ namespace CorpusSearchEngine
 
         public void AddNewExpander(string word)
         {
-            canvasStackPanel.Children.Add(new CustomExpander { word = word , isExpanded = false });
+            canvasStackPanel.Children.Add(new CustomExpander { word = word , isExpanded = true });
         }
 
         private string[] DivideText(string text, string word)
@@ -320,10 +320,143 @@ namespace CorpusSearchEngine
 
         }
 
+        public void SearchForWordEfficiently(string word, SearchMethods searchMethod)
+        {
+            List<string> foundWords = new List<string>();
+            List<int[]> bindNumberStartEndIndexes = new List<int[]>();
+            string path = "Texts/DIPLOMATARIUM.html";
+            CustomExpander expander;
+
+            //Dispatcher.Invoke(() => AddNewExpander(word));
+
+            //Find indexes and texts
+
+            if (searchMethod == SearchMethods.StreamBlocks)
+            {
+                foundWords = GetWordIndexesWithStreamBlocksEfficiently(path, word);
+            }
+
+            Dispatcher.InvokeAsync(() =>
+            {
+                AddNewExpander(word);
+
+                expander = canvasStackPanel.Children.OfType<CustomExpander>().Last();
+
+                if (expander != null)
+                {
+                    // Create and add TextTab to the CustomExpander
+                    CreateTabsFromTextEfficiently(word, foundWords, expander);
+                }
+            });
+
+            //Dispatcher.Invoke(() => UpdateResultText("Znalezione teksty: " + wordsCount.ToString()));
+        }
+
+        private void CreateTabsFromTextEfficiently(string word, List<string> texts, CustomExpander expander)
+        {
+            int numberIndex, bindIndex, textStartIndex, textEndIndex;
+            string numberValue, bindValue, textValue;
+
+            for (int i = 0; i < texts.Count; i++)
+            {
+                string tmp = texts[i];
+                numberIndex = texts[i].IndexOf("<b>Nummer:</b>") + 14;
+                bindIndex = texts[i].IndexOf("<FONT") + 16;
+                textStartIndex = texts[i].IndexOf("Brevtekst");
+                //textEndIndex = texts[i].IndexOf("</p>");
+
+                numberValue = texts[i].Substring(numberIndex, 7);
+                bindValue = texts[i].Substring(bindIndex, 4);
+                textValue = texts[i].Substring(textStartIndex);
+
+                numberValue = System.Text.RegularExpressions.Regex.Replace(numberValue, "[^0-9]", "");
+
+                textValue = ReplaceLineBreaks(textValue);
+                string[] dividedText = DivideText(textValue, word);
+
+                Dispatcher.Invoke(() => expander.AddNewEntry("Bind: " + bindValue, "Number: " + numberValue, dividedText));
+            }
+        }
+
+        private List<string> GetWordIndexesWithStreamBlocksEfficiently(string path, string word)
+        {
+            List<string> firstCollection = FindWordIndexesInFileEfficiently(path, word, bufferSize).ToList();
+            wordsCount = firstCollection.Count();
+
+            return firstCollection;
+        }
+
+        private IEnumerable<string> FindWordIndexesInFileEfficiently(string filePath, string word, int bufferSize)
+        {
+            int wordsNumber = 0;
+
+            using (var fileStream = File.OpenRead(filePath))
+            using (var streamReader = new StreamReader(fileStream))
+            {
+                char[] buffer = new char[bufferSize];
+                int charsRead;
+                string previousChunk = "";
+                string text = "";
+                string firstPartText = "";
+                string secondPartText = "";
+                bool isTextUnresolved = false;
+
+                int offset = 0;
+                while ((charsRead = streamReader.ReadBlock(buffer, 0, bufferSize)) > 0)
+                {
+                    string chunk = new string(buffer, 0, charsRead);
+
+                    if(isTextUnresolved)
+                    {
+                        secondPartText = chunk.Substring(0, chunk.IndexOf("</table>"));
+                        text = firstPartText + secondPartText;
+                        yield return text;
+                        isTextUnresolved = false;
+                    }
+
+                    int index = 0;
+                    while (index < charsRead)
+                    {
+                        index = chunk.IndexOf(word, index, StringComparison.Ordinal);
+
+                        if (index == -1)
+                            break;
+
+                        int startIndex = chunk.LastIndexOf("<a href=\"https:", index);
+                        int endIndex = chunk.IndexOf("</table>", index);
+
+                        if (endIndex == -1)
+                        {
+                            firstPartText = chunk.Substring(startIndex);
+                            isTextUnresolved = true;
+                        }
+                        else if (startIndex == -1)
+                        {
+                            firstPartText = previousChunk.Substring(previousChunk.LastIndexOf("<a href=\"https:"));
+                            secondPartText = chunk.Substring(0, chunk.IndexOf("</table>"));
+                            text = firstPartText + secondPartText;
+                            yield return text;
+                        }
+                        else
+                        {
+                            text = chunk.Substring(startIndex, endIndex - startIndex);
+                            yield return text;
+                        }
+
+                        wordsNumber++;
+                        index += word.Length;
+                    }
+
+                    previousChunk = chunk;
+                    offset += charsRead;
+                }
+            }
+        }
+
         public void SearchForWords(List<string> words, SearchMethods searchMethod)
         {
             for (int i = 0; i < words.Count; i++) {
-                SearchForWord(words[i], searchMethod);
+                SearchForWordEfficiently(words[i], searchMethod);
             }
 
             isSearching = false;
